@@ -1,0 +1,233 @@
+#include "raylib.h"
+#include <stdio.h>
+
+#define SCREEN_WIDTH 800
+#define SCREEN_HEIGHT 600
+
+#define BRICK_ROWS 5
+#define BRICK_COLS 10
+#define BRICK_WIDTH 70
+#define BRICK_HEIGHT 25
+#define BRICK_GAP 5
+
+typedef struct Brick {
+    Rectangle rect;
+    Color color;
+    int active;
+} Brick;
+
+int main(void)
+{
+    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Rainbow Block Breaker - C + Raylib");
+    SetTargetFPS(60);
+
+    Rectangle paddle = { 350, 540, 100, 20 };
+    float paddleSpeed = 7.0f;
+
+    Vector2 ball = { 400, 300 };
+    Vector2 ballSpeed = { 4.0f, -4.0f };
+    float ballRadius = 10.0f;
+
+    Brick bricks[BRICK_ROWS][BRICK_COLS];
+
+    Color rainbowColors[BRICK_ROWS] = {
+        RED,
+        ORANGE,
+        YELLOW,
+        GREEN,
+        BLUE
+    };
+
+    int score = 0;
+    int lives = 3;
+    int gameClear = 0;
+    int gameOver = 0;
+
+    for (int row = 0; row < BRICK_ROWS; row++)
+    {
+        for (int col = 0; col < BRICK_COLS; col++)
+        {
+            bricks[row][col].rect.x = 25 + col * (BRICK_WIDTH + BRICK_GAP);
+            bricks[row][col].rect.y = 60 + row * (BRICK_HEIGHT + BRICK_GAP);
+            bricks[row][col].rect.width = BRICK_WIDTH;
+            bricks[row][col].rect.height = BRICK_HEIGHT;
+            bricks[row][col].color = rainbowColors[row];
+            bricks[row][col].active = 1;
+        }
+    }
+
+    while (!WindowShouldClose())
+    {
+        if (!gameOver && !gameClear)
+        {
+            if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A))
+            {
+                paddle.x -= paddleSpeed;
+            }
+
+            if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D))
+            {
+                paddle.x += paddleSpeed;
+            }
+
+            if (paddle.x < 0)
+            {
+                paddle.x = 0;
+            }
+
+            if (paddle.x + paddle.width > SCREEN_WIDTH)
+            {
+                paddle.x = SCREEN_WIDTH - paddle.width;
+            }
+
+            ball.x += ballSpeed.x;
+            ball.y += ballSpeed.y;
+
+            if (ball.x - ballRadius <= 0 || ball.x + ballRadius >= SCREEN_WIDTH)
+            {
+                ballSpeed.x *= -1;
+            }
+
+            if (ball.y - ballRadius <= 0)
+            {
+                ballSpeed.y *= -1;
+            }
+
+            if (CheckCollisionCircleRec(ball, ballRadius, paddle))
+            {
+                ballSpeed.y = -ballSpeed.y;
+
+                float paddleCenter = paddle.x + paddle.width / 2;
+                float distance = ball.x - paddleCenter;
+                ballSpeed.x = distance / 15.0f;
+            }
+
+            for (int row = 0; row < BRICK_ROWS; row++)
+            {
+                for (int col = 0; col < BRICK_COLS; col++)
+                {
+                    if (bricks[row][col].active == 1)
+                    {
+                        if (CheckCollisionCircleRec(ball, ballRadius, bricks[row][col].rect))
+                        {
+                            bricks[row][col].active = 0;
+                            ballSpeed.y *= -1;
+                            score += 10;
+                        }
+                    }
+                }
+            }
+
+            int remainingBricks = 0;
+
+            for (int row = 0; row < BRICK_ROWS; row++)
+            {
+                for (int col = 0; col < BRICK_COLS; col++)
+                {
+                    if (bricks[row][col].active == 1)
+                    {
+                        remainingBricks++;
+                    }
+                }
+            }
+
+            if (remainingBricks == 0)
+            {
+                gameClear = 1;
+            }
+
+            if (ball.y - ballRadius > SCREEN_HEIGHT)
+            {
+                lives--;
+
+                ball.x = 400;
+                ball.y = 300;
+                ballSpeed.x = 4.0f;
+                ballSpeed.y = -4.0f;
+
+                paddle.x = 350;
+                paddle.y = 540;
+
+                if (lives <= 0)
+                {
+                    gameOver = 1;
+                }
+            }
+        }
+
+        if ((gameOver || gameClear) && IsKeyPressed(KEY_R))
+        {
+            score = 0;
+            lives = 3;
+            gameOver = 0;
+            gameClear = 0;
+
+            paddle.x = 350;
+            paddle.y = 540;
+
+            ball.x = 400;
+            ball.y = 300;
+            ballSpeed.x = 4.0f;
+            ballSpeed.y = -4.0f;
+
+            for (int row = 0; row < BRICK_ROWS; row++)
+            {
+                for (int col = 0; col < BRICK_COLS; col++)
+                {
+                    bricks[row][col].active = 1;
+                }
+            }
+        }
+
+        BeginDrawing();
+
+        ClearBackground(RAYWHITE);
+
+        DrawText("Rainbow Block Breaker", 20, 15, 24, DARKBLUE);
+
+        char scoreText[50];
+        sprintf(scoreText, "Score: %d", score);
+        DrawText(scoreText, 620, 15, 20, BLACK);
+
+        char livesText[50];
+        sprintf(livesText, "Lives: %d", lives);
+        DrawText(livesText, 620, 40, 20, BLACK);
+
+        for (int row = 0; row < BRICK_ROWS; row++)
+        {
+            for (int col = 0; col < BRICK_COLS; col++)
+            {
+                if (bricks[row][col].active == 1)
+                {
+                    DrawRectangleRec(bricks[row][col].rect, bricks[row][col].color);
+                    DrawRectangleLinesEx(bricks[row][col].rect, 1, BLACK);
+                }
+            }
+        }
+
+        DrawRectangleRec(paddle, DARKGRAY);
+        DrawCircleV(ball, ballRadius, MAROON);
+
+        DrawText("Move: LEFT / RIGHT or A / D", 20, 570, 18, GRAY);
+
+        if (gameClear)
+        {
+            DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, Fade(WHITE, 0.8f));
+            DrawText("GAME CLEAR!", 285, 250, 40, GREEN);
+            DrawText("Press R to Restart", 300, 310, 25, DARKGRAY);
+        }
+
+        if (gameOver)
+        {
+            DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, Fade(WHITE, 0.8f));
+            DrawText("GAME OVER", 290, 250, 40, RED);
+            DrawText("Press R to Restart", 300, 310, 25, DARKGRAY);
+        }
+
+        EndDrawing();
+    }
+
+    CloseWindow();
+
+    return 0;
+}
